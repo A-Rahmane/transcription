@@ -27,6 +27,7 @@ class FileSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(f"File size too large. Limit is {limit_mb}MB.")
         
         # Check file extension (allow audio/video)
+        # Check file extension (allow audio/video)
         allowed_extensions = ['.mp3', '.wav', '.mp4', '.m4a', '.mov', '.ogg', '.webm']
         import os
         ext = os.path.splitext(value.name)[1].lower()
@@ -44,6 +45,18 @@ class FolderSerializer(serializers.ModelSerializer):
         model = Folder
         fields = ('id', 'name', 'parent', 'owner', 'owner_username', 'created_at')
         read_only_fields = ('id', 'owner', 'created_at')
+
+    def validate_name(self, value):
+        # Sanitize folder name
+        value = escape(value.strip())
+        if not value:
+            raise serializers.ValidationError("Folder name cannot be empty")
+        if len(value) > 255:
+            raise serializers.ValidationError("Folder name too long")
+        # Prevent path traversal
+        if '/' in value or '\\' in value or '..' in value:
+            raise serializers.ValidationError("Invalid folder name")
+        return value
 
 class FolderDetailSerializer(FolderSerializer):
     subfolders = FolderSerializer(many=True, read_only=True)

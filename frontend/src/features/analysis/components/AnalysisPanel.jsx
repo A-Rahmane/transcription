@@ -25,10 +25,49 @@ const AnalysisPanel = ({ fileId }) => {
     };
 
     useEffect(() => {
-        fetchData();
-        const interval = setInterval(fetchData, 5000);
-        return () => clearInterval(interval);
-    }, [fileId]);
+        let isMounted = true;
+        let timeoutId;
+
+        const poll = async () => {
+            if (!isMounted) return;
+            try {
+                const jobsData = await transcriptionService.getJobsByFile(fileId);
+                if (!isMounted) return;
+                setJobs(jobsData);
+
+                const completedJob = jobsData.find(j => j.status === 'COMPLETED');
+                let shouldPoll = false;
+
+                if (!completedJob) {
+                    // If no completed job, we might be waiting for one to complete
+                    const pendingJob = jobsData.find(j => j.status !== 'FAILED');
+                    if (pendingJob) shouldPoll = true;
+                } else {
+                    const analysesData = await analysisService.getAnalyses(completedJob.id);
+                    if (!isMounted) return;
+                    setAnalyses(analysesData);
+
+                    // Check if any analysis is pending
+                    const hasPendingAnalysis = analysesData.some(a => a.status === 'PENDING' || a.status === 'PROCESSING');
+                    if (hasPendingAnalysis) shouldPoll = true;
+                }
+
+                if (shouldPoll) {
+                    timeoutId = setTimeout(poll, 5000);
+                }
+            } catch (err) {
+                console.error("Failed to fetch analysis data", err);
+                if (isMounted) timeoutId = setTimeout(poll, 10000);
+            }
+        };
+
+        poll();
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
+    }, [fileId, loading]); // Add loading dependency to restart polling after new request
 
     const completedJob = jobs.find(j => j.status === 'COMPLETED');
 
@@ -104,7 +143,7 @@ const AnalysisPanel = ({ fileId }) => {
                                 {analysis.type}
                             </span>
                             <span className={`text-xs font-medium ${analysis.status === 'COMPLETED' ? 'text-green-600' :
-                                    analysis.status === 'FAILED' ? 'text-red-600' : 'text-yellow-600'
+                                analysis.status === 'FAILED' ? 'text-red-600' : 'text-yellow-600'
                                 }`}>
                                 {analysis.status}
                             </span>

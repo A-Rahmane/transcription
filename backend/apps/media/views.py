@@ -82,39 +82,59 @@ class FileViewSet(viewsets.ModelViewSet):
         if not chunks.exists():
             return Response({'error': 'No chunks found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Assemble file
-        file_content = b''
-        for chunk in chunks:
-            with chunk.file.open('rb') as f:
-                file_content += f.read()
-            # Clean up chunk
-            chunk.delete() # Or keep for history? Usually delete to save space.
+        # Check total size
+        total_size = sum(chunk.file.size for chunk in chunks)
+        limit_mb = 500
+        if total_size > limit_mb * 1024 * 1024:
+             chunks.delete()
+             return Response({'error': f"Total file size exceeds limit of {limit_mb}MB."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create File object
-        folder = None
-        if folder_id:
-            folder = get_object_or_404(Folder, pk=folder_id)
-            # Check permission on folder?
-            # HasFolderAccess should handle it if we were accessing a folder object, 
-            # but here we are creating a file. 
-            # We should check if user has upload permission on this folder.
-            # For now, let's assume if they can see it they can upload (or check explicit permission)
-            # Logic: Owner or can_upload=True
-            if folder.owner != request.user:
-                 perm = Permission.objects.filter(folder=folder, user=request.user, can_upload=True).exists()
-                 if not perm:
-                     return Response({'error': 'No upload permission on this folder'}, status=status.HTTP_403_FORBIDDEN)
+        import tempfile
+        import shutil
+        from django.core.files import File as DjangoFile
 
-        file_obj = File.objects.create(
-            name=filename,
-            folder=folder,
-            owner=request.user,
-            size=len(file_content)
-        )
-        file_obj.file.save(filename, ContentFile(file_content))
-        file_obj.save()
+        tmp_path = None
+        try:
+            # Assemble file to temporary path to avoid memory issues
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                for chunk in chunks:
+                    with chunk.file.open('rb') as f:
+                        shutil.copyfileobj(f, tmp_file)
+                tmp_path = tmp_file.name
 
-        # Trigger async task
-        process_file_upload.delay(file_obj.id)
+            # Create File object
+            folder = None
+            if folder_id:
+                folder = get_object_or_404(Folder, pk=folder_id)
+                if folder.owner != request.user:
+                     perm = Permission.objects.filter(folder=folder, user=request.user, can_upload=True).exists()
+                     if not perm:
+                         if tmp_path and os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                         return Response({'error': 'No upload permission on this folder'}, status=status.HTTP_403_FORBIDDEN)
 
-        return Response(FileSerializer(file_obj).data, status=status.HTTP_201_CREATED)
+            file_obj = File.objects.create(
+                name=filename,
+                folder=folder,
+                owner=request.user,
+                size=total_size
+            )
+            
+            # Save content to FileField
+            with open(tmp_path, 'rb') as f:
+                file_obj.file.save(filename, DjangoFile(f))
+            file_obj.save()
+
+            # Cleanup
+            os.unlink(tmp_path)
+            chunks.delete()
+
+            # Trigger async task
+            process_file_upload.delay(file_obj.id)
+
+            return Response(FileSerializer(file_obj).data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

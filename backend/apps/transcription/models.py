@@ -20,5 +20,12 @@ class TranscriptionJob(models.Model):
     completed_at = models.DateTimeField(blank=True, null=True)
     error_message = models.TextField(blank=True, null=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['file']),
+            models.Index(fields=['created_at']),
+        ]
+
     def __str__(self):
         return f"Job {self.id} for {self.file.name} ({self.status})"

@@ -1,5 +1,4 @@
 from celery import shared_task
-import time
 
 @shared_task
 def process_file_upload(file_id):
@@ -9,6 +8,6 @@ def process_file_upload(file_id):
     """
     print(f"Processing file {file_id}...")
     # Simulate processing time
-    time.sleep(5)
+    # time.sleep(5) 
     print(f"File {file_id} processed.")
     return f"File {file_id} processed successfully."

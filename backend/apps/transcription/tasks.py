@@ -29,7 +29,7 @@ def run_transcription(job_id):
         # Update job
         job.status = TranscriptionJob.Status.COMPLETED
         job.language = result.get('language')
-        job.transcript_text = json.dumps(result) # Store full result as JSON
+        job.transcript_text = result.get('text', '') # Store plain text
         job.completed_at = timezone.now()
         job.save()
         

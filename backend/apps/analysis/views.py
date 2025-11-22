@@ -27,7 +27,10 @@ class AnalysisRequestViewSet(mixins.CreateModelMixin,
         job = get_object_or_404(TranscriptionJob, pk=job_id)
         
         # Check permission
-        if job.file.owner != request.user:
+        # Check permission using HasFolderAccess on the underlying file
+        from apps.media.permissions import HasFolderAccess
+        permission = HasFolderAccess()
+        if not permission.has_object_permission(request, self, job.file):
              return Response({"error": "You do not have permission to analyze this job."}, status=status.HTTP_403_FORBIDDEN)
 
         # Determine System Prompt based on Type

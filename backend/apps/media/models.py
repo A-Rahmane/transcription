@@ -18,6 +18,13 @@ class File(models.Model):
     uploaded_at = models.DateTimeField(auto_now_add=True)
     size = models.PositiveBigIntegerField(help_text="Size in bytes")
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['owner']),
+            models.Index(fields=['folder']),
+            models.Index(fields=['uploaded_at']),
+        ]
+
     def save(self, *args, **kwargs):
         if self.file:
             self.size = self.file.size

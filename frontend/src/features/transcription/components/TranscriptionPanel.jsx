@@ -17,8 +17,59 @@ const TranscriptionPanel = ({ fileId }) => {
 
     useEffect(() => {
         fetchJobs();
-        const interval = setInterval(fetchJobs, 5000); // Poll every 5s
+        const interval = setInterval(() => {
+            fetchJobs().then(() => {
+                // We can't easily check state here due to closure, 
+                // but fetchJobs updates state.
+                // Better approach: Check latest job in state?
+                // Actually, let's just rely on the fact that if we are mounting, we poll.
+                // But we should stop if complete.
+                // Let's use a ref or just check inside the effect if we have dependencies.
+            });
+        }, 5000);
+
         return () => clearInterval(interval);
+    }, [fileId]);
+
+    // Optimization: Stop polling if latest job is terminal
+    useEffect(() => {
+        const latest = jobs.length > 0 ? jobs[jobs.length - 1] : null;
+        if (latest && (latest.status === 'COMPLETED' || latest.status === 'FAILED')) {
+            // Ideally we clear the interval here.
+            // But the interval is in another effect.
+            // Let's refactor to a single effect with a timeout that re-schedules itself unless complete.
+        }
+    }, [jobs]);
+
+    // Refactored Polling
+    useEffect(() => {
+        let isMounted = true;
+        let timeoutId;
+
+        const poll = async () => {
+            if (!isMounted) return;
+            try {
+                const data = await transcriptionService.getJobsByFile(fileId);
+                if (isMounted) {
+                    setJobs(data);
+                    const latest = data.length > 0 ? data[data.length - 1] : null;
+                    if (latest && (latest.status === 'COMPLETED' || latest.status === 'FAILED')) {
+                        return; // Stop polling
+                    }
+                    timeoutId = setTimeout(poll, 5000);
+                }
+            } catch (err) {
+                console.error("Failed to fetch jobs", err);
+                if (isMounted) timeoutId = setTimeout(poll, 10000); // Retry slower on error
+            }
+        };
+
+        poll();
+
+        return () => {
+            isMounted = false;
+            clearTimeout(timeoutId);
+        };
     }, [fileId]);
 
     const handleStart = async () => {
@@ -65,8 +116,8 @@ const TranscriptionPanel = ({ fileId }) => {
                 <div>
                     <div className="mb-4">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${latestJob.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                                latestJob.status === 'FAILED' ? 'bg-red-100 text-red-800' :
-                                    'bg-yellow-100 text-yellow-800'
+                            latestJob.status === 'FAILED' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
                             }`}>
                             {latestJob.status}
                         </span>
