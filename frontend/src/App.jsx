@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './features/auth/pages/LoginPage';
 import RegisterPage from './features/auth/pages/RegisterPage';
 import MediaPage from './features/media/pages/MediaPage';
+import FileDetailsPage from './features/media/pages/FileDetailsPage';
 
 const RequireAuth = ({ children }) => {
   const { user, loading } = useAuth();

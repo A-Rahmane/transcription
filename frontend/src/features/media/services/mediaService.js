@@ -22,40 +22,56 @@ const getFolders = async (parentId = null) => {
 };
 
 const createFolder = async (name, parentId = null) => {
-    const data = { name };
-    if (parentId) {
-        data.parent = parentId;
+    try {
+        const data = { name };
+        if (parentId) {
+            data.parent = parentId;
+        }
+        const response = await axios.post('/media/folders/', data);
+        return response.data;
+    } catch (error) {
+        console.error("Error creating folder:", error);
+        throw error;
     }
-    const response = await axios.post('/media/folders/', data);
-    return response.data;
 };
 
 const uploadFile = async (file, folderId = null) => {
-    // Using the simple upload endpoint for now as per previous steps
-    // /api/media/files/upload/ or /api/media/files/
-    // The viewset has an 'upload' action at /media/files/upload/
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('name', file.name);
+        if (folderId) {
+            formData.append('folder', folderId);
+        }
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('name', file.name);
-    if (folderId) {
-        formData.append('folder', folderId);
+        const response = await axios.post('/media/files/upload/', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error uploading file:", error);
+        throw error;
     }
-
-    const response = await axios.post('/media/files/upload/', formData, {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    });
-    return response.data;
 };
 
 const deleteFile = async (fileId) => {
-    await axios.delete(`/media/files/${fileId}/`);
+    try {
+        await axios.delete(`/media/files/${fileId}/`);
+    } catch (error) {
+        console.error("Error deleting file:", error);
+        throw error;
+    }
 };
 
 const deleteFolder = async (folderId) => {
-    await axios.delete(`/media/folders/${folderId}/`);
+    try {
+        await axios.delete(`/media/folders/${folderId}/`);
+    } catch (error) {
+        console.error("Error deleting folder:", error);
+        throw error;
+    }
 };
 
 const mediaService = {

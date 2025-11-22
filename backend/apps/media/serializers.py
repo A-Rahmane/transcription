@@ -20,6 +20,21 @@ class FileSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'file', 'folder', 'owner', 'owner_username', 'uploaded_at', 'size')
         read_only_fields = ('id', 'owner', 'uploaded_at', 'size')
 
+    def validate_file(self, value):
+        # Check file size (e.g., limit to 500MB)
+        limit_mb = 500
+        if value.size > limit_mb * 1024 * 1024:
+            raise serializers.ValidationError(f"File size too large. Limit is {limit_mb}MB.")
+        
+        # Check file extension (allow audio/video)
+        allowed_extensions = ['.mp3', '.wav', '.mp4', '.m4a', '.mov', '.ogg', '.webm']
+        import os
+        ext = os.path.splitext(value.name)[1].lower()
+        if ext not in allowed_extensions:
+            raise serializers.ValidationError(f"Unsupported file extension. Allowed: {', '.join(allowed_extensions)}")
+        
+        return value
+
 class FolderSerializer(serializers.ModelSerializer):
     owner_username = serializers.CharField(source='owner.username', read_only=True)
     # We might want to list subfolders and files here, or in a separate view.

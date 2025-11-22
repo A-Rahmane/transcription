@@ -47,6 +47,13 @@ class FileViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 
+    @action(detail=False, methods=['post'], url_path='upload')
+    def upload(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(owner=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     @action(detail=False, methods=['post'], url_path='upload_chunk')
     def upload_chunk(self, request):
         serializer = ChunkedUploadSerializer(data=request.data)
@@ -63,6 +70,13 @@ class FileViewSet(viewsets.ModelViewSet):
         
         if not upload_id or not filename:
              return Response({'error': 'upload_id and filename are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate file extension
+        allowed_extensions = ['.mp3', '.wav', '.mp4', '.m4a', '.mov', '.ogg', '.webm']
+        import os
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in allowed_extensions:
+            return Response({'error': f"Unsupported file extension. Allowed: {', '.join(allowed_extensions)}"}, status=status.HTTP_400_BAD_REQUEST)
 
         chunks = ChunkedUpload.objects.filter(upload_id=upload_id).order_by('offset')
         if not chunks.exists():

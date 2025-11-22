@@ -33,28 +33,28 @@ class TranscriptionJobViewSet(mixins.CreateModelMixin,
         file_obj = get_object_or_404(File, pk=file_id)
         
         # Check permission
-        # User must have access to the file to transcribe it.
-        # We can use HasFolderAccess logic or just check ownership/permission manually.
-        # Let's reuse HasFolderAccess logic if possible, or simple check.
-        # Since HasFolderAccess works on objects in viewsets, we can manually check here.
+        # User must be the owner of the file OR have explicit access to the folder.
         if file_obj.owner != request.user:
-             # Check shared permissions
-             # This is a bit complex to reuse HasFolderAccess directly without a view context for the file.
-             # Let's do a quick check:
-             has_access = False
-             folder = file_obj.folder
-             if folder:
-                 # Check recursive permissions... 
-                 # For now, let's restrict to Owner or explicit Editor/Viewer on the file's folder?
-                 # Actually, if you can view the file, you can probably transcribe it?
-                 # Let's stick to: User must be owner or have VIEW access.
-                 # Re-implementing recursive check here is messy.
-                 # Ideally we should move permission logic to a service or model method.
-                 pass
-             
-             # For MVP/Prototype: Allow if user owns the file.
-             if file_obj.owner != request.user:
-                 return Response({"error": "You do not have permission to transcribe this file."}, status=status.HTTP_403_FORBIDDEN)
+            has_access = False
+            folder = file_obj.folder
+            if folder:
+                # Check if user is owner of the folder
+                if folder.owner == request.user:
+                    has_access = True
+                else:
+                    # Check recursive permissions (simplified for now: direct permission on this folder)
+                    # Ideally we should use a service to check recursive permissions.
+                    # For now, check if there is a Permission object for this user on this folder.
+                    # We assume if they can view the folder, they can transcribe files in it.
+                    from apps.media.models import Permission
+                    has_access = Permission.objects.filter(
+                        folder=folder, 
+                        user=request.user, 
+                        can_view=True
+                    ).exists()
+            
+            if not has_access:
+                return Response({"error": "You do not have permission to transcribe this file."}, status=status.HTTP_403_FORBIDDEN)
 
         # Create Job
         job = TranscriptionJob.objects.create(
