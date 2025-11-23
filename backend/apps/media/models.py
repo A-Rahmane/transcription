@@ -23,6 +23,9 @@ class File(models.Model):
             models.Index(fields=['owner']),
             models.Index(fields=['folder']),
             models.Index(fields=['uploaded_at']),
+            models.Index(fields=['owner', 'folder']),
+            models.Index(fields=['folder', 'uploaded_at']),
+            models.Index(fields=['owner', 'uploaded_at']),
         ]
 
     def save(self, *args, **kwargs):

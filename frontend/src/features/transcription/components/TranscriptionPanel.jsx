@@ -15,20 +15,9 @@ const TranscriptionPanel = ({ fileId }) => {
         }
     };
 
+    // Initial fetch
     useEffect(() => {
         fetchJobs();
-        const interval = setInterval(() => {
-            fetchJobs().then(() => {
-                // We can't easily check state here due to closure, 
-                // but fetchJobs updates state.
-                // Better approach: Check latest job in state?
-                // Actually, let's just rely on the fact that if we are mounting, we poll.
-                // But we should stop if complete.
-                // Let's use a ref or just check inside the effect if we have dependencies.
-            });
-        }, 5000);
-
-        return () => clearInterval(interval);
     }, [fileId]);
 
     // Optimization: Stop polling if latest job is terminal

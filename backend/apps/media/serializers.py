@@ -48,6 +48,7 @@ class FolderSerializer(serializers.ModelSerializer):
 
     def validate_name(self, value):
         # Sanitize folder name
+        from django.utils.html import escape
         value = escape(value.strip())
         if not value:
             raise serializers.ValidationError("Folder name cannot be empty")
